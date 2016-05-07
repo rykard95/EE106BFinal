@@ -1,4 +1,0 @@
-<launch>
-    <include file="$(find final)/launch/kinect1.launch"/>
-    <include file="$(find final)/launch/kinect2.launch"/>
-</launch>
