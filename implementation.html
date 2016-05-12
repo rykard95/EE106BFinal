@@ -37,67 +37,51 @@
         </div><!-- /.container-fluid -->
     </nav>
     <div class="content">
-        <div class='info col-md-12' name='eye'>
-            <h2>The Eye</h2>
+        <div class='info col-md-6'>
+            <h2>Hardware</h2>
             <div class="col-md-12">
-                <p>
-                    Using Baxter's hand cameras, we obtain a raw image of the board and its 
-                    surroundings.  It is the Eye node's job to find the chess board and map it to a 
-                    2D representation (as if taken from directly above by a camera pointing straight 
-                    down) for the brain to analyze, as well as calculate the real-world coordinates 
-                    of the chessboard
-                </p>
-                <img src="imgs/boardpoints.jpg">
-                <p>
-                    The first step is to find the region in the image corresponding to the
-                    chessboard. It turns out that this is pretty much a solved problem thanks
-                    to the common use of checkerboards for camera calibration; we used a
-                    built-in OpenCV library function to find the corners of the board on a
-                    scaled-down version of the camera input image, then scaled the computed
-                    corners back up to match the original input.
-                </p>
-                <p>
-                    At this point in the pipeline, we have both the coordinates of the chessboard
-                    corners in the chessboard frame (computed from the hardcoded board square size
-                    and the known geometry of all chessboards) and the points that they map to in
-                    the input image from the hand camera. 
-                    From this correspondance, we can compute a homography between the two point sets
-                    (using the RANSAC algorithm to discard outliers because some of the detected
-                    corners will actually be part of a piece rather than the board itself).
-                    We do this by using OpenCV library functions to find the RBT from the
-                    camera to the chessboard frame and compute the homography based on that RBT.
-                </p>
-                <img src="imgs/unperspective.png" style='float:right; width:256px; height:256px; margin-left:20px;'>
-                <p>
-                    The inverse-perspective-mapped version of the chessboard image and the 
-                    world-frame positions of the four outside corners are then computed.
-                    Then, all that remains is to package up the relevant data into messages and 
-                    send it to the brain: the inverse-perspective chessboard image as well as the
-                    real-world coordinates of the four corners.
-                </p>
-                <p>The main Python package used in this module is <b>OpenCV</b>.</p>
-                <img src="http://docs.opencv.org/3.0-beta/_static/opencv-logo2.png" style='width:100px; height:100px; margin-left:20px;'>
+                <h3>Xbox Kinects</h3>
+                <div class="col-md-6">
+                    <p>
+                        The Xbox kinects are set up so that they can generate a point cloud from opposite ends
+                        of an object. Because of their high bandwidth output, a single usb controller cannot
+                        handle the output of two kinects. With this in mind, we must use usb ports which use different
+                        controllers. This translates to using usb ports farthest from each other on the computer.
+                    </p> 
+                    <p>
+                        Once the kinks were figured out, we used the ros package <em>freenect_launch</em> to interface
+                        with the kinects and publish point cloud data. The majority of the time was spent on figuring 
+                        out this interface, but afterwards, we were able to move quickly when implementing the rest 
+                        of the software.
+                    </p>
+                </div>
+                <div class="col-md-6">
+                    <img src="imgs/IMG_6034.JPG" style="width=100%">
+                </div>
             </div>   
         </div>
-        <div class='info col-md-12' name='brain'>
-            <h2>The Brain</h2>
-            <div class="col-md-12">
-                <p>After receiving image and coordinate information from the Eye, the Brain must update its internal state, communicate with its chess engine, and then send movement coordinates to the Arm. </p>
-                <p>The first step in this process is updating the Brain's internal state.  Using its previous board state and the chess engine API, the Brain generates all possible next board states.  Afterwards, it takes the 2D board image and use that as evidence in order to infer the next board state.  In order to figure out what the board is, we take our 2D images and split it into individual squares in order from top left to bottom right.  We then featurize these squares using a <a href="https://en.wikipedia.org/wiki/Histogram_of_oriented_gradients"><b>Histogram of Oriented Gradients</b></a> and the send these feature vectors to a <a href="http://scikit-learn.org/stable/modules/generated/sklearn.ensemble.RandomForestClassifier.html"><b>Random Decision Forest</b></a> that has been trained to recognize empty squares and piece colors.  For each square, we get a probability distribution of the possible states: empty, contains a white piece, and contains a black piece.  From there, we take each possible board and weight each board using the log sum of the probability of the board given our image.  We then choose the board with the greatest weight as our board state</p>
-                <img src="imgs/braindiag.PNG" style='float:right; padding-left:20px'>
-                <p>Once the Brain figures out what board state it is in, it can then send this board to the chess engine and query a next move.  When the engine returns a move in UCI notation (i.e 'e1g1'), the brain then uses the coordinates sent from the Eye to map the squares in the move to world frame coordinates.  Also returned from the engine is whether of not the move was a 'capture' and we handle that by passing that message onwards to the Arm.  We then wrap these coordinates in a MoveMessage and then publish that message to the brainstem topic </p>
-                <p>The python packages used in this module are: <b>Sklearn, Skimage, and python-chess</b>.</p>
-                <div class='col-md-4'><img src="http://scikit-learn.org/stable/_images/scikit-learn-logo-notext.png"></div>
-                <div class='col-md-4'><img src="http://scikit-image.org/_static/img/logo.png"></div>
-                <div class='col-md-4'><img src="http://pydata.org/static/uploads/sponsor_logos/PSF-Logo-Narrow-Shapes.png"></div>
-            </div>   
-        </div>
-        <div class='info col-md-12' name='arm'>
-            <h2>The Arm</h2>
-            <img src="imgs/moves.PNG">
-            <p>Before the game begins, we must initialize 3 of Baxter's poses or load them from a file.  We then touch the gripper to the board to obtain the z-coordinate of the board.  Baxter then enters a viewing state with its camera arm is a place it can see the board.  Once the Arm receives a MoveMessage from the Brain, it will then parse the message for the move type.  The move type can be one of capture, castle, move, or en passant. Knowing what type of move to make, Baxter then assumes its action pose, which involves moving its camera arm to a safe location and its gripper arm to the center above the board.  It then performs the required action and returns its gripper hand to a safe location and moves its camera into a viewing position.</p>
-            <p>The packages we used in this module are: <b>MoveIt!</b></p>
-            <div class='col-md-12' style='text-align:center; width:100%;'><img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQRIlPv0vNl4O0AnYdq4KA_kft1sic-Nrgn549QhFvvwccMSqFcrfDpUIRC"></div>
+        <div class='info col-md-6'>
+            <h2>Software</h2>
+            <div class="col-md-6">
+                <h3>ROS Packages</h3>
+                <p>These are the packages that made it possible for us to create our grasping system.</p>
+                <p>We use <em>ar_track_alvar</em> as a way to calibrate the cameras and discover
+                the location of the kinects relative to Baxter's base frame.</p>
+                <p>Picture of ar tag</p>
+                <p>For manipulating Baxter, we used the <em>MoveIt!</em> API, which was a quick way to
+                generate motion plans. However, because we were using the RRT algorithm implemented by
+                <em>MoveIt!</em>, there were some cases where a motion plan could not be found.</p>
+
+                <p><img src="imgs/Moveit_logo.png"></p>
+            </div> 
+            <div class="col-md-6">
+                <h3>Neural Networks</h3>
+                <p>We use python and the numpy module to featurize our grasps and build our neural
+                network. This neural network architecture was inspired by the one used in our machine
+                learning course. We use a logistic loss function and a hyperbolic tangent activation function
+                in the hidden layer and a sigmoid activation function for the output layer.</p>
+                <p><img src="imgs/nn.png"></p>
+            </div>    
         </div>
     </div>
 
